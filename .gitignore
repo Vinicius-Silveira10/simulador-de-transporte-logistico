@@ -3,14 +3,14 @@
 Thumbs.db
 
 # Unity Framework
-LogisticsSimulator/[Ll]ibrary/
-LogisticsSimulator/[Tt]emp/
-LogisticsSimulator/[Oo]bj/
-LogisticsSimulator/[Bb]uild/
-LogisticsSimulator/[Bb]uilds/
-LogisticsSimulator/[Ll]ogs/
-LogisticsSimulator/[Mm]emoryCaptures/
-LogisticsSimulator/[Uu]ser[Ss]ettings/
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+[Uu]ser[Ss]ettings/
 *.csproj
 *.unityproj
 *.sln
