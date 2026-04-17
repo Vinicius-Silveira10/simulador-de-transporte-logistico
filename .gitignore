@@ -1,0 +1,39 @@
+# Global Rules
+.DS_Store
+Thumbs.db
+
+# Unity Framework
+LogisticsSimulator/[Ll]ibrary/
+LogisticsSimulator/[Tt]emp/
+LogisticsSimulator/[Oo]bj/
+LogisticsSimulator/[Bb]uild/
+LogisticsSimulator/[Bb]uilds/
+LogisticsSimulator/[Ll]ogs/
+LogisticsSimulator/[Mm]emoryCaptures/
+LogisticsSimulator/[Uu]ser[Ss]ettings/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# .NET Backend
+backend_api/bin/
+backend_api/obj/
+backend_api/.vs/
+backend_api/appsettings.Development.json
+
+# Node/React Frontend
+frontend_web/node_modules/
+frontend_web/dist/
+frontend_web/.env.local
+frontend_web/.env.development.local
