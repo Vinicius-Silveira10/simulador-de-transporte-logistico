@@ -39,6 +39,13 @@ namespace LogisticsTrackingAPI.Controllers
         public async Task<ActionResult<Trip>> PostTrip(Trip trip)
         {
             _context.Trips.Add(trip);
+            
+            // Adiciona o lucro bruto na conta IMEDIATAMENTE (Tycoon Mode)
+            var company = await _context.Players.FindAsync(trip.PlayerId);
+            if(company != null) {
+                company.NetWorth += trip.NetProfit;
+            }
+
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetTrip), new { id = trip.Id }, trip);
@@ -77,11 +84,11 @@ namespace LogisticsTrackingAPI.Controllers
             trip.NetProfit -= payload.FinalFuelCost;
             trip.IncidentLogs = payload.IncidentLogs;
             
-            // TYCOON: O Jogo Financeiro Real. Entrando Dinheiro Vivo no Caixa da Empresa!
+            // TYCOON: Desconta APENAS os custos de viagem (frete/combustível/acidentes).
+            // O lucro base já cai na assinatura do contrato!
             var company = await _context.Players.FindAsync(trip.PlayerId);
             if(company != null) {
-                // Lucro cai na conta oficial
-                company.NetWorth += trip.NetProfit;
+                company.NetWorth -= payload.FinalFuelCost;
             }
 
             await _context.SaveChangesAsync();

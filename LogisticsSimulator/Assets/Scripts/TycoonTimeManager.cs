@@ -4,37 +4,51 @@ using System.Collections;
 
 public class TycoonTimeManager : MonoBehaviour
 {
-    // O Jogo gira as horas em tempo real. Cada "Dia" financeiro são 4 segundos na vida real.
-    public float secondsPerDay = 4.0f; 
-    private float timer = 0f;
+    // Sistema Tycoon em Turnos! O Tempo não passa mais sozinho.
     private int localDayCounter = 0; // Para uso em loop de 30 dias
+    
+    // O Turno começa às 02:00 (Pedido pelo CEO)
+    public static float CurrentHour = 2f; 
+    
+    // A HUd lê isso para desenhar o Relógio
+    public static float CurrentTimeRatio { get { return CurrentHour / 24f; } }
 
     void Start()
     {
-        Debug.Log("Relógio Empresarial Aguardando Login Multiplayer...");
+        Debug.Log("Tycoon de Turnos Aguardando Ações Táticas...");
     }
 
-    void Update()
+    public void AdvanceHours(int hoursToAdd)
     {
-        // Trava totalmente o relógio se o Menu, Negociação ou Evento estiverem abertos na tela! (Mecânica de Turnos/Pause)
         if (DialogueSystem.GlobalPlayerId == 0 || DialogueSystem.EndGameLocked) return;
         
-        // Verifica se a tela está limpa (estado 0). Se o jogador estiver focando na aba, o tempo congela.
-        DialogueSystem ui = FindObjectOfType<DialogueSystem>();
-        if (ui != null && ui.GetDialogState() != 0) return;
+        CurrentHour += hoursToAdd;
+        Debug.Log($"Tempo Avançado! Hora atual: {CurrentHour}:00");
 
-        timer += Time.deltaTime;
-        if (timer >= secondsPerDay)
+        if (CurrentHour >= 24f)
         {
-            timer = 0f;
-            StartCoroutine(AdvanceDayAPI());
+            EndDayEarly();
         }
+    }
+
+    public void EndDayEarly()
+    {
+        if (DialogueSystem.GlobalPlayerId == 0 || DialogueSystem.EndGameLocked) return;
+        
+        CurrentHour = 2f; // Reseta O Relógio de Turnos pra 2 da Manhã automaticamente!! Impede o Loop Infinito de spams.
+        StartCoroutine(AdvanceDayAPI());
     }
 
     IEnumerator AdvanceDayAPI()
     {
-        using (UnityWebRequest request = UnityWebRequest.PostWwwForm($"http://localhost:5041/api/Company/{DialogueSystem.GlobalPlayerId}/tick-day", ""))
+        // Bugfix: Unity Web Request falha no envio de POST sem payload explícito
+        string url = $"{GameConfig.COMPANY_BASE_URL}/{DialogueSystem.GlobalPlayerId}/tick-day";
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
+            request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes("{}"));
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            
             yield return request.SendWebRequest();
             if (request.result == UnityWebRequest.Result.Success)
             {
@@ -42,10 +56,16 @@ public class TycoonTimeManager : MonoBehaviour
                int novoDia = resp.currentDay;
                
                // CORREÇÃO: Religa o relógio interno no front da Unity e a Central
+               int diaAnterior = DialogueSystem.GlobalCurrentDay;
                DialogueSystem.GlobalCurrentDay = novoDia;
 
-               // ATUALIZA A HUD E OS VALORES NA TELA
-               FindObjectOfType<DialogueSystem>()?.TriggerHUDRefresh();
+               // ATUALIZA A HUD E OS VALORES NA TELA E DISPARA O EVENTO DE "FECHAMENTO DE CAIXA"
+               DialogueSystem ui = FindFirstObjectByType<DialogueSystem>();
+               if (ui != null) {
+                   ui.TriggerHUDRefresh();
+                   // A Júlia agora para a tela renderizando o Lucro do Dia, por isso o Toast sumiu daqui!
+                   ui.TriggerDailyReport(diaAnterior);
+               }
 
                // FIM DE TEMPORADA BATALHA! GlobalMaxDays Atingidos
                if (novoDia >= DialogueSystem.GlobalMaxDays && !DialogueSystem.EndGameLocked) {
@@ -57,7 +77,7 @@ public class TycoonTimeManager : MonoBehaviour
 
                // EVENTO DE NPC (Ex: Policial parando na estrada) -> A cada 7 dias
                if (novoDia % 7 == 0 && !DialogueSystem.EndGameLocked) {
-                   FindObjectOfType<DialogueSystem>()?.TriggerRandomEvent();
+                   FindFirstObjectByType<DialogueSystem>()?.TriggerRandomEvent();
                }
                if (localDayCounter >= 30 && !DialogueSystem.EndGameLocked) {
                    localDayCounter = 0;
@@ -69,8 +89,13 @@ public class TycoonTimeManager : MonoBehaviour
 
     IEnumerator PayMonthlyBillsAPI()
     {
-        using (UnityWebRequest request = UnityWebRequest.PostWwwForm($"http://localhost:5041/api/Company/{DialogueSystem.GlobalPlayerId}/pay-bills", ""))
+        string url = $"{GameConfig.COMPANY_BASE_URL}/{DialogueSystem.GlobalPlayerId}/pay-bills";
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
+            request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes("{}"));
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            
             yield return request.SendWebRequest();
             if (request.result == UnityWebRequest.Result.Success) {
                PayBillsResponse bills = JsonUtility.FromJson<PayBillsResponse>(request.downloadHandler.text);

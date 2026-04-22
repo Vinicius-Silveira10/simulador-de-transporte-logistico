@@ -9,7 +9,7 @@ public class SceneAutomator : Editor
         Debug.Log("Iniciando Montagem da Cidade Tycoon (High-Quality Models)...");
 
         // 0. Limpeza Geral (Agora com o método moderno do Unity 6)
-        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = allObjects.Length - 1; i >= 0; i--) {
             GameObject obj = allObjects[i];
             if (obj != null) {

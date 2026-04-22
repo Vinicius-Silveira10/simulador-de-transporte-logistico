@@ -30,6 +30,8 @@ public class DialogueSystem : MonoBehaviour
     private Texture2D npcRoberto = null;
     private Texture2D npcTanaka = null;
     private Texture2D npcSilvia = null;
+    private Texture2D npcCarlos = null;
+    private Texture2D npcMarcal = null;
 
     private int dialogState = -1; 
     public int GetDialogState() { return dialogState; } // Expõe a variável para o Motor de Tempo pausar!
@@ -39,11 +41,34 @@ public class DialogueSystem : MonoBehaviour
     private float finalRevenue = 0f;
     private bool isSubmitting = false;
 
+    // Cache de Referências (Performance & Gestão de Turno)
+    private TruckController cachedTruck;
+    private TycoonTimeManager cachedTime;
+
     private int companyFleet = 1;
     private float demandMultiplier = 1.0f;
     private Rect windowRect;
     private string dialogTitle = "PABX Corporativo";
     private string dialogText = "Carregando...";
+
+    // --- SISTEMA TOAST E FLUXO DIÁRIO ---
+    public struct Toast { public string text; public float time; }
+    private System.Collections.Generic.List<Toast> activeToasts = new System.Collections.Generic.List<Toast>();
+    private float startOfDayNetWorth = 0f; // Variavel Sombra que clona o seu Caixa para calculo do Lucro Diario
+    private int contractsAcceptedToday = 0; // Nova Regra de Frota: Contador de Despachos
+
+    public void ShowToast(string message) {
+        activeToasts.Add(new Toast { text = message, time = 4.0f });
+    }
+
+    void Update() {
+        for (int i = activeToasts.Count - 1; i >= 0; i--) {
+            Toast t = activeToasts[i];
+            t.time -= Time.deltaTime;
+            if (t.time <= 0) activeToasts.RemoveAt(i);
+            else activeToasts[i] = t;
+        }
+    }
 
     // State Vars do Banco
     private bool stateHasLoan = false;
@@ -51,11 +76,16 @@ public class DialogueSystem : MonoBehaviour
     void Start() {
         if (GlobalPlayerId == 0) dialogState = -1;
         
+        cachedTruck = FindFirstObjectByType<TruckController>();
+        cachedTime = FindFirstObjectByType<TycoonTimeManager>();
+
         // Carrega Avatares Silenciosamente para VRAM
         npcJulia = Resources.Load<Texture2D>("NPC/npc_julia");
         npcRoberto = Resources.Load<Texture2D>("NPC/npc_roberto");
         npcTanaka = Resources.Load<Texture2D>("NPC/npc_tanaka");
         npcSilvia = Resources.Load<Texture2D>("NPC/npc_silvia");
+        npcCarlos = Resources.Load<Texture2D>("NPC/npc_carlos");
+        npcMarcal = Resources.Load<Texture2D>("NPC/npc_marcal");
 
         // Puxa e inicia o Satélite do Clima (Ideia 1) silenciosamente pra economizar clique do Estagiário
         if (FindObjectOfType<DynamicWeather>() == null) {
@@ -73,14 +103,20 @@ public class DialogueSystem : MonoBehaviour
         if (GlobalPlayerId != 0 && dialogState != -1) {
             GUI.backgroundColor = new Color(0.1f, 0.4f, 0.2f, 0.95f);
             GUI.Box(new Rect(0, 0, Screen.width, 40), "");
-            GUI.Label(new Rect(20, 10, Screen.width, 30), $"🗓️ Dia: <b>{GlobalCurrentDay}/{GlobalMaxDays}</b>   |   💰 Caixa Lìquido: <b>R$ {GlobalNetWorth:F2}</b>   |   🚚 Caminhões: <b>{GlobalFleet}</b>   |   🏦 Dívida Banco: <b>R$ {GlobalLoanDebt:F2}</b>", textStyle);
+            
+            // Relógio em Turnos Baseado em Horas
+            int h = Mathf.FloorToInt(TycoonTimeManager.CurrentHour);
+            int m = 0; // Turnos exatos não perdem tempo com minutos
+            string digitalClock = $"{h:D2}:{m:D2}";
+            
+            GUI.Label(new Rect(20, 10, Screen.width, 30), $"🗓️ Dia: <b>{GlobalCurrentDay}/{GlobalMaxDays}</b>   |   ⏰ Hora: <b>{digitalClock}</b>   |   💰 Caixa Lìquido: <b>R$ {GlobalNetWorth:F2}</b>   |   🚚 Caminhões: <b>{GlobalFleet}</b>   |   🏦 Dívida Banco: <b>R$ {GlobalLoanDebt:F2}</b>", textStyle);
         }
 
-        // >>> JANELA DE EVENTO INVASIVO DO NPC (Cobre a tela inteira) <<<
-        if (dialogState == 10) {
+        // >>> JANELA DE EVENTO INVASIVO DO NPC (Cobre a tela inteira) Y = 10 (Eventos Aleatorios), Y = 11 (Fechamento Relatorio Diario) <<<
+        if (dialogState == 10 || dialogState == 11) {
             GUI.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f); // Dossiê Sombrio e Elegante
             Rect evtRect = new Rect(Screen.width/2 - 350, Screen.height/2 - 250, 700, 520); // GIGANTE!
-            GUI.Window(99, evtRect, DrawEventScreen, "⚠️ " + eventTitle);
+            GUI.Window(99, evtRect, dialogState == 10 ? DrawEventScreen : DrawDailyReportScreen, "⚠️ " + eventTitle);
             return; // Bloqueia outros cliques do jogador
         }
 
@@ -102,6 +138,28 @@ public class DialogueSystem : MonoBehaviour
 
         // >>> BOTÃO FLUTUANTE DE REABRIR O PABX <<<
         if (dialogState == 0) {
+            // HUD Informativa de Status da Frota
+            bool isTruckWorking = cachedTruck != null && cachedTruck.isMoving;
+
+            if (isTruckWorking) {
+                GUI.color = Color.yellow;
+                GUI.Label(new Rect(Screen.width - 250, Screen.height - 110, 240, 30), "🚚 Frota Ativa em Trânsito...");
+                GUI.color = Color.white;
+            }
+
+            // Controle Tycoon de Turnos Livres (Sempre Visíveis!)
+            GUI.backgroundColor = new Color(0.6f, 0.4f, 0.1f, 0.9f);
+            if (GUI.Button(new Rect(Screen.width - 270, Screen.height - 70, 120, 50), "⏩ Pular 1 Hora")) {
+                cachedTime?.AdvanceHours(1);
+            }
+
+            GUI.backgroundColor = new Color(0.3f, 0.2f, 0.5f, 0.9f);
+            if (GUI.Button(new Rect(Screen.width - 140, Screen.height - 70, 120, 50), "🌙 Fechar Caixa")) {
+                // Nova Regra de Gestão: O Dia encerra AGORA, independente da posição do caminhão.
+                if (cachedTruck != null) cachedTruck.ForceResetToGarage();
+                cachedTime?.EndDayEarly();
+            }
+
             GUI.backgroundColor = new Color(0.2f, 0.4f, 0.8f, 0.9f);
             if (GUI.Button(new Rect(20, Screen.height - 70, 250, 50), "📞 Chamar a Júlia (PABX)")) {
                 StartCoroutine(FetchCompanyStateForJulia());
@@ -119,6 +177,18 @@ public class DialogueSystem : MonoBehaviour
         }
 
         windowRect = GUI.Window(0, windowRect, DrawDialogWindow, dialogTitle);
+
+        // >>> RENDERIZA TOASTS <<<
+        int toastY = Screen.height - 100;
+        for (int i = activeToasts.Count - 1; i >= 0; i--) {
+            Toast t = activeToasts[i];
+            float alpha = t.time > 1f ? 1f : t.time;
+            GUI.color = new Color(1f, 0.8f, 0.4f, alpha); // Laranja Dourado Tycoon
+            GUIStyle toastStyle = new GUIStyle(GUI.skin.box) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            GUI.Box(new Rect(Screen.width - 340, toastY, 320, 40), t.text, toastStyle);
+            toastY -= 45; // Empilha
+        }
+        GUI.color = Color.white;
     }
 
     void DrawLoginScreen(int id) {
@@ -134,7 +204,7 @@ public class DialogueSystem : MonoBehaviour
 
     IEnumerator LoginPlayerAPI() {
         LoginPayload payload = new LoginPayload { Key = loginInputKey };
-        UnityWebRequest req = new UnityWebRequest("http://localhost:5041/api/Company/login", "POST");
+        UnityWebRequest req = new UnityWebRequest(GameConfig.LOGIN_URL, "POST");
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload)));
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
@@ -150,7 +220,8 @@ public class DialogueSystem : MonoBehaviour
             
             if (GlobalCurrentDay >= GlobalMaxDays) EndGameLocked = true;
             else {
-                // Ao logar, a tela fica livre para o jogador ver a rodovia e só abre quando ele clicar na Júlia
+                // A UI fará a calibração de Relógio com o Shadow Account
+                startOfDayNetWorth = GlobalNetWorth; 
                 dialogState = 0; 
                 StartCoroutine(FetchCompanyStateForJulia()); 
             }
@@ -177,6 +248,20 @@ public class DialogueSystem : MonoBehaviour
             dialogState = 0; // Libera o Jogo
             if (eventCost > 0) StartCoroutine(ChargeEventAPI(eventCost));
             else { isSubmitting = false; TriggerHUDRefresh(); }
+        }
+    }
+
+    void DrawDailyReportScreen(int id) {
+        GUIStyle tStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, wordWrap = true, richText = true };
+        
+        if (loadedEventImage != null) GUI.DrawTexture(new Rect(20, 30, 200, 200), loadedEventImage, ScaleMode.ScaleToFit);
+        
+        GUI.Label(new Rect(240, 30, 420, 200), eventMessage, tStyle);
+        GUI.Label(new Rect(20, 240, 660, 40), "<i>O relógio das 00h00 está travado. Os motoristas aguardam a liberação de seu acesso Mestre C-Level.</i>", tStyle);
+        
+        if (!isSubmitting && GUI.Button(new Rect(250, 400, 200, 60), "[Assinar] Avançar Dia")) {
+            startOfDayNetWorth = GlobalNetWorth; // Zero a balança novamente pro dia que começa!
+            dialogState = 0; // Libera o Jogo! Começa Tudo De Novo!
         }
     }
 
@@ -225,28 +310,49 @@ public class DialogueSystem : MonoBehaviour
             if (npcJulia != null) GUI.DrawTexture(new Rect(20, 30, 80, 80), npcJulia, ScaleMode.ScaleToFit);
             GUI.Label(new Rect(110, 30, windowRect.width - 150, 80), dialogText, textStyle);
 
-            GUI.Label(new Rect(20, 115, windowRect.width - 40, 30), "<b>Catálogo de Clientes Disponíveis:</b>", textStyle);
+            GUI.Label(new Rect(20, 115, windowRect.width - 40, 30), $"<b>Catálogo de Clientes Disponíveis:</b> (Frota Disponível: {GlobalFleet - contractsAcceptedToday}/{GlobalFleet})", textStyle);
 
-            // MURAL 1: ROBERTO ALIMENTOS
-            GUI.Box(new Rect(20, 145, 230, 235), "");
-            if (npcRoberto != null) GUI.DrawTexture(new Rect(30, 155, 210, 125), npcRoberto, ScaleMode.ScaleToFit);
-            else GUI.Label(new Rect(30, 155, 210, 125), "[Avatar npc_roberto Ausente]", textStyle);
-            GUI.Label(new Rect(30, 290, 210, 40), "📦 Chef Roberto (Alimentos)", textStyle);
-            if (GUI.Button(new Rect(30, 330, 210, 40), $"Aceitar R$ {800 * demandMultiplier:F0}")) { currentNPC = "Alimentos"; finalRevenue = 800f * demandMultiplier; StartDialogTree(); }
+            if (contractsAcceptedToday >= GlobalFleet) {
+                GUI.backgroundColor = Color.red;
+                GUI.Box(new Rect(20, 145, windowRect.width - 40, 235), "");
+                GUI.Label(new Rect(40, 200, windowRect.width - 80, 100), "<size=24><b>⚠️ FROTA 100% OCUPADA</b></size>\n\nVocê já despachou todos os caminhões disponíveis para hoje. \n<b>Dica:</b> Encerre o dia no botão '🌙 Fechar Caixa' para renovar sua frota amanhã!", new GUIStyle(textStyle) { alignment = TextAnchor.MiddleCenter });
+                GUI.backgroundColor = Color.white;
+            } else {
+                // MURAL 1: ROBERTO ALIMENTOS
+            GUI.Box(new Rect(20, 145, 170, 235), "");
+            if (npcRoberto != null) GUI.DrawTexture(new Rect(30, 155, 150, 125), npcRoberto, ScaleMode.ScaleToFit);
+            else GUI.Label(new Rect(30, 155, 150, 125), "[Sem Avatar]", textStyle);
+            GUI.Label(new Rect(30, 290, 150, 40), "📦 Roberto (Alimentos)", textStyle);
+            if (GUI.Button(new Rect(30, 330, 150, 40), $"R$ {800 * demandMultiplier:F0}")) { currentNPC = "Alimentos"; finalRevenue = 800f * demandMultiplier; StartDialogTree(); }
 
             // MURAL 2: ENG. TANAKA PEÇAS
-            GUI.Box(new Rect(260, 145, 230, 235), "");
-            if (npcTanaka != null) GUI.DrawTexture(new Rect(270, 155, 210, 125), npcTanaka, ScaleMode.ScaleToFit);
-            else GUI.Label(new Rect(270, 155, 210, 125), "[Avatar npc_tanaka Ausente]", textStyle);
-            GUI.Label(new Rect(270, 290, 210, 40), "⚙️ Eng. Tanaka (Peças)", textStyle);
-            if (GUI.Button(new Rect(270, 330, 210, 40), $"Aceitar R$ {1500 * demandMultiplier:F0}")) { currentNPC = "Peças"; finalRevenue = 1500f * demandMultiplier; StartDialogTree(); }
+            GUI.Box(new Rect(200, 145, 170, 235), "");
+            if (npcTanaka != null) GUI.DrawTexture(new Rect(210, 155, 150, 125), npcTanaka, ScaleMode.ScaleToFit);
+            else GUI.Label(new Rect(210, 155, 150, 125), "[Sem Avatar]", textStyle);
+            GUI.Label(new Rect(210, 290, 150, 40), "⚙️ Tanaka (Peças)", textStyle);
+            if (GUI.Button(new Rect(210, 330, 150, 40), $"R$ {1500 * demandMultiplier:F0}")) { currentNPC = "Peças"; finalRevenue = 1500f * demandMultiplier; StartDialogTree(); }
 
             // MURAL 3: DRA SILVIA LUXURY
-            GUI.Box(new Rect(500, 145, 230, 235), "");
-            if (npcSilvia != null) GUI.DrawTexture(new Rect(510, 155, 210, 125), npcSilvia, ScaleMode.ScaleToFit);
-            else GUI.Label(new Rect(510, 155, 210, 125), "[Avatar npc_silvia Ausente]", textStyle);
-            GUI.Label(new Rect(510, 290, 210, 40), "💊 Dra. Silvia (Farmacêutica)", textStyle);
-            if (GUI.Button(new Rect(510, 330, 210, 40), $"Trato VIP: R$ {3500 * demandMultiplier:F0}")) { currentNPC = "Medicamentos"; finalRevenue = 3500f * demandMultiplier; StartDialogTree(); }
+            GUI.Box(new Rect(380, 145, 170, 235), "");
+            if (npcSilvia != null) GUI.DrawTexture(new Rect(390, 155, 150, 125), npcSilvia, ScaleMode.ScaleToFit);
+            else GUI.Label(new Rect(390, 155, 150, 125), "[Sem Avatar]", textStyle);
+            GUI.Label(new Rect(390, 290, 150, 40), "💊 Dra. Silvia (Vacinas)", textStyle);
+            if (GUI.Button(new Rect(390, 330, 150, 40), $"R$ {3500 * demandMultiplier:F0}")) { currentNPC = "Medicamentos"; finalRevenue = 3500f * demandMultiplier; StartDialogTree(); }
+
+            // MURAL 4: CARLOS PETROLEO
+            GUI.Box(new Rect(560, 145, 170, 235), "");
+            if (npcCarlos != null) GUI.DrawTexture(new Rect(570, 155, 150, 125), npcCarlos, ScaleMode.ScaleToFit);
+            else GUI.Label(new Rect(570, 155, 150, 125), "[Sem Avatar]", textStyle);
+            GUI.Label(new Rect(570, 290, 150, 40), "🛢️ Carlos (Petróleo)", textStyle);
+            if (GUI.Button(new Rect(570, 330, 150, 40), $"R$ {5000 * demandMultiplier:F0}")) { currentNPC = "Petróleo"; finalRevenue = 5000f * demandMultiplier; StartDialogTree(); }
+
+            // MURAL 5: MARÇAL CONTÊINER
+            GUI.Box(new Rect(740, 145, 170, 235), "");
+            if (npcMarcal != null) GUI.DrawTexture(new Rect(750, 155, 150, 125), npcMarcal, ScaleMode.ScaleToFit);
+            else GUI.Label(new Rect(750, 155, 150, 125), "[Sem Avatar]", textStyle);
+            GUI.Label(new Rect(750, 290, 150, 40), "🚢 Marçal (Portuário)", textStyle);
+            if (GUI.Button(new Rect(750, 330, 150, 40), $"R$ {2800 * demandMultiplier:F0}")) { currentNPC = "Contêiner"; finalRevenue = 2800f * demandMultiplier; StartDialogTree(); }
+            }
 
             // BOTAO FINAL DE DESLIGAR ISOLADO NA DIREITA
             GUI.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.9f);
@@ -312,12 +418,16 @@ public class DialogueSystem : MonoBehaviour
         if (currentNPC == "Alimentos") dialogText = "<b>[Roberto]</b>: Rodovia esburacada. Você garante proteção total da carga?";
         else if (currentNPC == "Peças") dialogText = "<b>[Tanaka]</b>: Blocos de motor pesados. Vai aguentar os socos sem rachar?";
         else if (currentNPC == "Medicamentos") dialogText = "<b>[Dra. Silvia]</b>: Se as vacinas estragarem no baú quente eu te processo!";
+        else if (currentNPC == "Petróleo") dialogText = "<b>[Carlos]</b>: Combustível classe A inflamável. Tem seguro contra explosões na pista?";
+        else if (currentNPC == "Contêiner") dialogText = "<b>[Marçal]</b>: O navio chinês apita no porto amanhã. Suporta essa tonelagem extra?";
     }
 
     void UpdateRound2Text() {
         if (currentNPC == "Alimentos") dialogText = "<b>[Roberto]</b>: Tudo certo! Vou avisar os peões.";
         if (currentNPC == "Peças") dialogText = "<b>[Tanaka]</b>: Despache logo.";
         if (currentNPC == "Medicamentos") dialogText = "<b>[Dra. Silvia]</b>: Contrato assinado. Vida deles na sua rede.";
+        if (currentNPC == "Petróleo") dialogText = "<b>[Carlos]</b>: Carga blindada! Caminhão tanque tá pesado, ande devagar e com Deus!";
+        if (currentNPC == "Contêiner") dialogText = "<b>[Marçal]</b>: Papelada do Porto assinada. Libera no pátio!";
     }
 
     void ResetDialog() {
@@ -327,7 +437,7 @@ public class DialogueSystem : MonoBehaviour
     }
 
     IEnumerator FetchCompanyStateForJulia() {
-        using (UnityWebRequest request = UnityWebRequest.Get($"http://localhost:5041/api/Company/{GlobalPlayerId}/state")) {
+        using (UnityWebRequest request = UnityWebRequest.Get($"{GameConfig.COMPANY_BASE_URL}/{GlobalPlayerId}/state")) {
             yield return request.SendWebRequest();
             if (request.result == UnityWebRequest.Result.Success) {
                 CompanyState state = JsonUtility.FromJson<CompanyState>(request.downloadHandler.text);
@@ -349,8 +459,9 @@ public class DialogueSystem : MonoBehaviour
                 if (month % 2 == 0) demandMultiplier *= 1.25f; 
                 if (companyFleet >= 3) demandMultiplier *= 0.85f; 
                 
-                dialogState = 1;
-            } else dialogState = 1;
+                // BUGFIX: Só reseta o estado se estivermos no login ou menu, preservando sub-menus de decisão!
+                if (dialogState <= 1) dialogState = 1;
+            } else if (dialogState <= 0) dialogState = 1;
         }
     }
 
@@ -360,6 +471,25 @@ public class DialogueSystem : MonoBehaviour
     
     public void TriggerHUDRefresh() {
         if (dialogState != -1 && !EndGameLocked && !isSubmitting) StartCoroutine(FetchCompanyStateForJulia());
+    }
+
+    public void TriggerDailyReport(int passedDay) {
+        if (dialogState == -1 || EndGameLocked || dialogState == 10) return;
+        
+        contractsAcceptedToday = 0; // Reset diário da regra de frota!
+
+        // Magia Matemática de Tycoon
+        float dailyProfit = GlobalNetWorth - startOfDayNetWorth;
+        
+        eventTitle = $"Fechamento Contábil DRE - Ciclo de 24h";
+        
+        string colorCode = dailyProfit >= 0 ? "<color=#00FF00>" : "<color=#FF0000>";
+        string sign = dailyProfit >= 0 ? "+" : "";
+
+        eventMessage = $"<b>[Júlia (RH Central)]</b>\nChefe, as frotas desligaram os motores. Bateu 24h!\n\nEste é o resumo das faturas e punições de todos os seus despachos de hoje (Dia {passedDay}): \n\n<size=22><b>Balanço Diário: {colorCode}{sign} R$ {dailyProfit:F2}</color></b></size>";
+        
+        loadedEventImage = npcJulia;
+        dialogState = 11;
     }
 
     public void TriggerMonthlyReceipt(float cost) {
@@ -411,7 +541,7 @@ public class DialogueSystem : MonoBehaviour
             playerId = GlobalPlayerId, origin = "Balanca Rodoviaria", destination = "Penalidade", revenue = 0,
             taxesAmount = 0, kmCosts = 0, netProfit = -tax, status = "Fined", contractorNPC = "Governo"
         };
-        UnityWebRequest req = new UnityWebRequest("http://localhost:5041/api/Trips", "POST");
+        UnityWebRequest req = new UnityWebRequest(GameConfig.TRIPS_URL, "POST");
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload)));
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
@@ -428,18 +558,22 @@ public class DialogueSystem : MonoBehaviour
             playerId = GlobalPlayerId, origin = "0,0", destination = targetCoord, revenue = finalRevenue,
             taxesAmount = finalRevenue * 0.12f, kmCosts = 0f, netProfit = finalRevenue - (finalRevenue * 0.12f), status = "Negotiating", contractorNPC = currentNPC
         };
-        UnityWebRequest req = new UnityWebRequest("http://localhost:5041/api/Trips", "POST");
+        UnityWebRequest req = new UnityWebRequest(GameConfig.TRIPS_URL, "POST");
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload)));
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
 
         yield return req.SendWebRequest();
         yield return new WaitForSeconds(1.5f);
-        isSubmitting = false; ResetDialog();
+        if (req.result == UnityWebRequest.Result.Success) contractsAcceptedToday++; // Sucesso! Um caminhão a menos.
+        isSubmitting = false; 
+        ResetDialog();
+        TriggerHUDRefresh(); // Agora ele puxa o saldo logo na largada do contrato!
+        FindFirstObjectByType<TycoonTimeManager>()?.AdvanceHours(2);
     }
 
     IEnumerator BuyTruckAPI() {
-        using (UnityWebRequest request = UnityWebRequest.PostWwwForm($"http://localhost:5041/api/Company/{GlobalPlayerId}/buy-truck", "")) {
+        using (UnityWebRequest request = UnityWebRequest.PostWwwForm($"{GameConfig.COMPANY_BASE_URL}/{GlobalPlayerId}/buy-truck", "")) {
             yield return request.SendWebRequest();
             yield return new WaitForSeconds(1.5f);
             isSubmitting = false; ResetDialog();
@@ -447,7 +581,7 @@ public class DialogueSystem : MonoBehaviour
     }
 
     IEnumerator TakeLoanAPI() {
-        using (UnityWebRequest request = UnityWebRequest.PostWwwForm($"http://localhost:5041/api/Company/{GlobalPlayerId}/take-loan", "")) {
+        using (UnityWebRequest request = UnityWebRequest.PostWwwForm($"{GameConfig.COMPANY_BASE_URL}/{GlobalPlayerId}/take-loan", "")) {
             yield return request.SendWebRequest();
             if (request.result == UnityWebRequest.Result.Success) Debug.Log("Empréstimo R$30.000 Caiu na Conta!");
             yield return new WaitForSeconds(1.0f);
@@ -457,7 +591,7 @@ public class DialogueSystem : MonoBehaviour
 
     IEnumerator BuyUpgradeAPI(string typeStr) {
         UpgradePayload payload = new UpgradePayload { Type = typeStr };
-        UnityWebRequest req = new UnityWebRequest($"http://localhost:5041/api/Company/{GlobalPlayerId}/buy-upgrade", "POST");
+        UnityWebRequest req = new UnityWebRequest($"{GameConfig.COMPANY_BASE_URL}/{GlobalPlayerId}/buy-upgrade", "POST");
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload)));
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");

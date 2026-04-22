@@ -5,7 +5,7 @@ using System.Globalization;
 
 public class TruckController : MonoBehaviour
 {
-    private string apiUrl = "http://localhost:5041/api/Trips";
+    private string apiUrl = GameConfig.TRIPS_URL;
     
     // Controle
     public bool isMoving = false;
@@ -23,13 +23,12 @@ public class TruckController : MonoBehaviour
 
     // Variaveis Fisicas & Estéticas da Fase 2
     private Vector3 docaInicial;
-    private ParticleSystem exhaustSmoke;
 
     void Start()
     {
         docaInicial = transform.position;
-        exhaustSmoke = GetComponentInChildren<ParticleSystem>();
-        if(exhaustSmoke != null) exhaustSmoke.Stop();
+        // Fumaça removida a pedido do CEO (Desativa qualquer sistema de partículas residual)
+        foreach (var ps in GetComponentsInChildren<ParticleSystem>()) ps.gameObject.SetActive(false);
 
         Debug.Log("Caminhão Operacional! Checando pátio do Backend...");
         StartCoroutine(PollTripsRoutine());
@@ -39,16 +38,9 @@ public class TruckController : MonoBehaviour
     {
         if (isMoving)
         {
-            // Particulas do escape rodando
-            if(exhaustSmoke != null && !exhaustSmoke.isPlaying) exhaustSmoke.Play();
-
-            // Matemática Espacial p/ Frente
+            // Movimentação retilínea suave pelo asfalto
             transform.position = Vector3.MoveTowards(transform.position, targetPosition, movementSpeed * Time.deltaTime);
             transform.LookAt(targetPosition);
-
-            // Simulação matemática de Suspensão (Caminhão tremendo devido a Carga/Buracos)
-            float bounce = Mathf.Sin(Time.time * 25f) * 0.04f;
-            transform.position = new Vector3(transform.position.x, transform.position.y + bounce, transform.position.z);
 
             // Roda o Gerador de Destino/Imprevistos a cada 1.5s
             eventTimer += Time.deltaTime;
@@ -63,12 +55,9 @@ public class TruckController : MonoBehaviour
         }
         else
         {
-            // Desligar o motor (limpa fumaça)
-            if(exhaustSmoke != null && exhaustSmoke.isPlaying) exhaustSmoke.Stop();
-            
-            // Estacionamento reverso para a Doca Base
+            // Estacionamento reverso suave para a Doca Base
             if (Vector3.Distance(transform.position, docaInicial) > 0.5f) {
-                transform.position = Vector3.Lerp(transform.position, docaInicial, Time.deltaTime * 2f); // Retorna devagarzin
+                transform.position = Vector3.MoveTowards(transform.position, docaInicial, (movementSpeed + 1f) * Time.deltaTime); 
                 transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.Euler(0,0,0), Time.deltaTime * 3f);
             }
         }
@@ -168,17 +157,8 @@ public class TruckController : MonoBehaviour
         extraPunitiveCosts = 0f;
         eventTimer = 0f;
         
-        string[] destRaw = trip.destination.Split(',');
-        if (destRaw.Length == 2)
-        {
-            float dstX = float.Parse(destRaw[0], CultureInfo.InvariantCulture);
-            float dstZ = float.Parse(destRaw[1], CultureInfo.InvariantCulture);
-            targetPosition = new Vector3(dstX, 0.5f, dstZ);
-        }
-        else
-        {
-            targetPosition = new Vector3(Random.Range(5, 10), 0.5f, Random.Range(5, 10));
-        }
+        // Direciona o caminhão para o horizonte sul (Z negativo) acompanhando a rodovia asfaltada!
+        targetPosition = new Vector3(docaInicial.x, docaInicial.y, docaInicial.z - 80f);
         
         tripDistance = Vector3.Distance(transform.position, targetPosition);
         
@@ -187,6 +167,10 @@ public class TruckController : MonoBehaviour
             movementSpeed = 4.5f; // Caminhão Urgência Médica
         } else if(trip.contractorNPC == "Peças") {
             movementSpeed = 1.8f; // Carga Pesada (Lento)
+        } else if(trip.contractorNPC == "Petróleo") {
+            movementSpeed = 1.3f; // Explosivo Rastejante! Extremamente perigoso.
+        } else if(trip.contractorNPC == "Contêiner") {
+            movementSpeed = 1.9f; // Marítimo Super Pesado
         } else {
             movementSpeed = 2.5f; // Alimento e Padrão
         }
@@ -215,10 +199,24 @@ public class TruckController : MonoBehaviour
 
         yield return request.SendWebRequest();
 
-        if (request.result == UnityWebRequest.Result.Success)
+        if (request.result == UnityWebRequest.Result.Success) {
             Debug.Log($"Incidente Computado e Pago via PUT. NetProfit diminuido no BD.");
-        else
+            DialogueSystem ui = FindFirstObjectByType<DialogueSystem>();
+            if (ui != null) {
+                ui.TriggerHUDRefresh();
+                ui.ShowToast($"💰 Frete Pago: Caixa Atualizado!");
+            }
+        } else {
             Debug.LogError($"Erro ao finalizar: {request.error}");
+        }
+    }
+
+    public void ForceResetToGarage()
+    {
+        isMoving = false;
+        transform.position = docaInicial;
+        transform.rotation = Quaternion.Euler(0, 0, 0);
+        Debug.Log("Logística Resetada: Caminhão retornou à garagem para novo turno.");
     }
 }
 
