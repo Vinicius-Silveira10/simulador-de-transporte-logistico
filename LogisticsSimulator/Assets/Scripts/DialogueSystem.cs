@@ -76,8 +76,8 @@ public class DialogueSystem : MonoBehaviour
     void Start() {
         if (GlobalPlayerId == 0) dialogState = -1;
         
-        cachedTruck = FindFirstObjectByType<TruckController>();
-        cachedTime = FindFirstObjectByType<TycoonTimeManager>();
+        cachedTruck = FindObjectOfType<TruckController>();
+        cachedTime = FindObjectOfType<TycoonTimeManager>();
 
         // Carrega Avatares Silenciosamente para VRAM
         npcJulia = Resources.Load<Texture2D>("NPC/npc_julia");
@@ -91,102 +91,134 @@ public class DialogueSystem : MonoBehaviour
         if (FindObjectOfType<DynamicWeather>() == null) {
             new GameObject("Controlador_Climatico").AddComponent<DynamicWeather>();
         }
+
+        // AUTO-INJEÇÃO DE AMBIENTAÇÃO ELITE (Task 1.1)
+        if (FindObjectOfType<EliteAmbienceManager>() == null) {
+            new GameObject("Elite_Ambience_Generator").AddComponent<EliteAmbienceManager>();
+        }
     }
 
     void OnGUI()
     {
-        windowRect = new Rect(20, Screen.height - 240, Screen.width - 40, 220); // Janela maior
+        // === CONFIGURAÇÃO DE DESIGN PREMIUM ===
+        Color glassBlue = new Color(0.05f, 0.1f, 0.2f, 0.92f);
+        Color accentCyan = new Color(0.02f, 0.7f, 0.82f, 1f);
+        Color accentGold = new Color(1f, 0.84f, 0f, 1f);
+        
+        windowRect = new Rect(20, Screen.height - 240, Screen.width - 40, 220); 
         GUI.color = Color.white;
-        GUIStyle textStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, wordWrap = true, richText = true };
+        
+        GUIStyle textStyle = new GUIStyle(GUI.skin.label) { 
+            fontSize = 15, 
+            wordWrap = true, 
+            richText = true,
+            fontStyle = FontStyle.Normal
+        };
+        
+        GUIStyle headerStyle = new GUIStyle(textStyle) {
+            fontSize = 18,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleLeft
+        };
 
-        // >>> DESENHA A HUD FINANCEIRA (SEMPRE VISÍVEL APÓS LOGIN) <<<
+        // >>> DESENHA A HUD FINANCEIRA (TOP BAR GLASSMORPISM) <<<
         if (GlobalPlayerId != 0 && dialogState != -1) {
-            GUI.backgroundColor = new Color(0.1f, 0.4f, 0.2f, 0.95f);
-            GUI.Box(new Rect(0, 0, Screen.width, 40), "");
+            GUI.backgroundColor = new Color(0.02f, 0.05f, 0.1f, 0.95f);
+            GUI.Box(new Rect(0, 0, Screen.width, 45), ""); // Fundo da Barra
             
-            // Relógio em Turnos Baseado em Horas
+            // Linha de acento inferior (Cyan Glow)
+            GUI.color = accentCyan;
+            GUI.DrawTexture(new Rect(0, 43, Screen.width, 2), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            
             int h = Mathf.FloorToInt(TycoonTimeManager.CurrentHour);
-            int m = 0; // Turnos exatos não perdem tempo com minutos
-            string digitalClock = $"{h:D2}:{m:D2}";
+            string digitalClock = $"{h:D2}:00";
             
-            GUI.Label(new Rect(20, 10, Screen.width, 30), $"🗓️ Dia: <b>{GlobalCurrentDay}/{GlobalMaxDays}</b>   |   ⏰ Hora: <b>{digitalClock}</b>   |   💰 Caixa Lìquido: <b>R$ {GlobalNetWorth:F2}</b>   |   🚚 Caminhões: <b>{GlobalFleet}</b>   |   🏦 Dívida Banco: <b>R$ {GlobalLoanDebt:F2}</b>", textStyle);
+            string hudText = $"<color=#00e5ff>🗓️ DIA {GlobalCurrentDay}</color>  |  <color=#ffd700>⏰ {digitalClock}</color>  |  💰 CAIXA: <color=#00ff88>R$ {GlobalNetWorth:N2}</color>  |  🚚 FROTA: <b>{GlobalFleet}</b>";
+            GUI.Label(new Rect(25, 8, Screen.width, 30), hudText, headerStyle);
         }
 
-        // >>> JANELA DE EVENTO INVASIVO DO NPC (Cobre a tela inteira) Y = 10 (Eventos Aleatorios), Y = 11 (Fechamento Relatorio Diario) <<<
+        // >>> JANELAS DE EVENTO (MODAL CENTRAL) <<<
         if (dialogState == 10 || dialogState == 11) {
-            GUI.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.98f); // Dossiê Sombrio e Elegante
-            Rect evtRect = new Rect(Screen.width/2 - 350, Screen.height/2 - 250, 700, 520); // GIGANTE!
-            GUI.Window(99, evtRect, dialogState == 10 ? DrawEventScreen : DrawDailyReportScreen, "⚠️ " + eventTitle);
-            return; // Bloqueia outros cliques do jogador
-        }
-
-        if (dialogState == -1) // LOGIN
-        {
-            GUI.backgroundColor = new Color(0.1f, 0.3f, 0.5f, 0.9f);
-            GUI.Window(0, new Rect(20, Screen.height - 180, Screen.width - 40, 160), DrawLoginScreen, "🏆 TYCOON E-SPORTS: Registrar no Torneio");
+            GUI.backgroundColor = glassBlue;
+            Rect evtRect = new Rect(Screen.width/2 - 350, Screen.height/2 - 260, 700, 520);
+            
+            // Sombra externa simples
+            GUI.color = new Color(0, 0, 0, 0.5f);
+            GUI.Box(new Rect(evtRect.x + 5, evtRect.y + 5, evtRect.width, evtRect.height), "");
+            GUI.color = Color.white;
+            
+            GUI.Window(99, evtRect, dialogState == 10 ? DrawEventScreen : DrawDailyReportScreen, "");
             return;
         }
 
-        if (EndGameLocked) // FIM
+        if (dialogState == -1) // LOGIN SCREEN
         {
-            GUI.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.9f);
-            GUI.Window(0, new Rect(20, Screen.height - 180, Screen.width - 40, 160), (id) => {
-                GUI.Label(new Rect(20, 30, windowRect.width - 40, 60), $"<b>FIM DA TEMPORADA (Meta de {GlobalMaxDays} Dias Atingida)!</b> \nSua jornada competitiva encerrou. Vá ao painel React para ver como você ficou no Ranking Mundial!", textStyle);
-            }, "🏆 TEMPORADA FINALIZADA");
+            GUI.backgroundColor = new Color(0.05f, 0.15f, 0.25f, 0.98f);
+            GUI.Window(0, new Rect(Screen.width/2 - 300, Screen.height/2 - 100, 600, 200), DrawLoginScreen, "🔐 ACESSO RESTRITO: TERMINAL LOGÍSTICO");
             return;
         }
 
-        // >>> BOTÃO FLUTUANTE DE REABRIR O PABX <<<
+        if (EndGameLocked) // END SCREEN
+        {
+            GUI.backgroundColor = new Color(0.3f, 0.05f, 0.05f, 0.95f);
+            GUI.Window(0, new Rect(Screen.width/2 - 300, Screen.height/2 - 100, 600, 200), (id) => {
+                GUI.Label(new Rect(20, 50, 560, 100), $"<size=22><b>TEMPORADA ENCERRADA!</b></size>\n\nMeta de {GlobalMaxDays} dias atingida. Verifique sua posição no Ranking Web.", textStyle);
+            }, "🏆 RESULTADO FINAL");
+            return;
+        }
+
+        // >>> BOTÕES DE AÇÃO RÁPIDA (CANTO INFERIOR DIREITO) <<<
         if (dialogState == 0) {
-            // HUD Informativa de Status da Frota
-            bool isTruckWorking = cachedTruck != null && cachedTruck.isMoving;
-
-            if (isTruckWorking) {
-                GUI.color = Color.yellow;
-                GUI.Label(new Rect(Screen.width - 250, Screen.height - 110, 240, 30), "🚚 Frota Ativa em Trânsito...");
-                GUI.color = Color.white;
-            }
-
-            // Controle Tycoon de Turnos Livres (Sempre Visíveis!)
-            GUI.backgroundColor = new Color(0.6f, 0.4f, 0.1f, 0.9f);
-            if (GUI.Button(new Rect(Screen.width - 270, Screen.height - 70, 120, 50), "⏩ Pular 1 Hora")) {
+            // Background blur-like panel for buttons
+            GUI.backgroundColor = new Color(0, 0, 0, 0.6f);
+            GUI.Box(new Rect(Screen.width - 290, Screen.height - 130, 270, 115), "");
+            
+            GUI.backgroundColor = new Color(0.2f, 0.6f, 1f, 0.9f);
+            if (GUI.Button(new Rect(Screen.width - 275, Screen.height - 115, 120, 45), "⏩ +1 HORA")) {
                 cachedTime?.AdvanceHours(1);
             }
 
-            GUI.backgroundColor = new Color(0.3f, 0.2f, 0.5f, 0.9f);
-            if (GUI.Button(new Rect(Screen.width - 140, Screen.height - 70, 120, 50), "🌙 Fechar Caixa")) {
-                // Nova Regra de Gestão: O Dia encerra AGORA, independente da posição do caminhão.
+            GUI.backgroundColor = new Color(0.6f, 0.1f, 0.1f, 0.9f);
+            if (GUI.Button(new Rect(Screen.width - 145, Screen.height - 115, 120, 45), "🌙 FECHAR")) {
                 if (cachedTruck != null) cachedTruck.ForceResetToGarage();
                 cachedTime?.EndDayEarly();
             }
 
-            GUI.backgroundColor = new Color(0.2f, 0.4f, 0.8f, 0.9f);
-            if (GUI.Button(new Rect(20, Screen.height - 70, 250, 50), "📞 Chamar a Júlia (PABX)")) {
+            GUI.backgroundColor = accentCyan;
+            if (GUI.Button(new Rect(Screen.width - 275, Screen.height - 60, 250, 45), "📞 ABRIR PABX CENTRAL")) {
                 StartCoroutine(FetchCompanyStateForJulia());
             }
-            return; // Se a tela principal estiver limpa pra visualizar o 3D, não desenha janelas falsas!
+            return;
         }
 
         if (dialogState == 5) return; 
         
-        GUI.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.9f);
+        GUI.backgroundColor = glassBlue;
         
-        // SE FOR O MENU CENTRAL DE NEGOCIAÇÃO, A JANELA CRESCE PRO CENTRO E ENGULHE O 3D!
         if (dialogState == 2 && currentNPC != "Vendedor") {
-            windowRect = new Rect(20, Screen.height/2 - 200, Screen.width - 40, 400); 
+            windowRect = new Rect(Screen.width/2 - 470, Screen.height/2 - 220, 940, 440); 
         }
 
-        windowRect = GUI.Window(0, windowRect, DrawDialogWindow, dialogTitle);
+        windowRect = GUI.Window(0, windowRect, DrawDialogWindow, "");
 
-        // >>> RENDERIZA TOASTS <<<
-        int toastY = Screen.height - 100;
+        // >>> TOAST SYSTEM (NOTIFICAÇÕES MODERNAS) <<<
+        int toastY = 60;
         for (int i = activeToasts.Count - 1; i >= 0; i--) {
             Toast t = activeToasts[i];
             float alpha = t.time > 1f ? 1f : t.time;
-            GUI.color = new Color(1f, 0.8f, 0.4f, alpha); // Laranja Dourado Tycoon
-            GUIStyle toastStyle = new GUIStyle(GUI.skin.box) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            GUI.Box(new Rect(Screen.width - 340, toastY, 320, 40), t.text, toastStyle);
-            toastY -= 45; // Empilha
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            
+            GUIStyle toastStyle = new GUIStyle(GUI.skin.box) { 
+                fontSize = 14, 
+                fontStyle = FontStyle.Bold, 
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = Color.white }
+            };
+            
+            GUI.backgroundColor = new Color(0.02f, 0.7f, 0.82f, 0.85f * alpha);
+            GUI.Box(new Rect(Screen.width - 320, toastY, 300, 35), t.text, toastStyle);
+            toastY += 40;
         }
         GUI.color = Color.white;
     }
@@ -253,163 +285,130 @@ public class DialogueSystem : MonoBehaviour
 
     void DrawDailyReportScreen(int id) {
         GUIStyle tStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, wordWrap = true, richText = true };
-        
         if (loadedEventImage != null) GUI.DrawTexture(new Rect(20, 30, 200, 200), loadedEventImage, ScaleMode.ScaleToFit);
-        
         GUI.Label(new Rect(240, 30, 420, 200), eventMessage, tStyle);
         GUI.Label(new Rect(20, 240, 660, 40), "<i>O relógio das 00h00 está travado. Os motoristas aguardam a liberação de seu acesso Mestre C-Level.</i>", tStyle);
-        
         if (!isSubmitting && GUI.Button(new Rect(250, 400, 200, 60), "[Assinar] Avançar Dia")) {
-            startOfDayNetWorth = GlobalNetWorth; // Zero a balança novamente pro dia que começa!
-            dialogState = 0; // Libera o Jogo! Começa Tudo De Novo!
+            startOfDayNetWorth = GlobalNetWorth; 
+            dialogState = 0; 
         }
     }
 
     void DrawDialogWindow(int windowID)
     {
-        GUIStyle textStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, wordWrap = true, richText = true };
+        GUIStyle textStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true, richText = true };
+        Color accentCyan = new Color(0.02f, 0.7f, 0.82f, 1f);
 
-        if (dialogState == 1) // MENU MASTER (Agora com Upgrades e Banco)
+        if (dialogState == 1) // MENU MASTER
         {
-            dialogTitle = $"☎️ Central: {GlobalPlayerName} | Dia Limite: {GlobalCurrentDay}/120";
-            GUI.Label(new Rect(20, 30, windowRect.width - 40, 40), "Selecione o ramal para despachos Tycoon (Ramais Novos Adicionados!):", textStyle);
-
-            GUI.backgroundColor = new Color(0.2f, 0.4f, 0.8f, 0.9f);
-            if (GUI.Button(new Rect(20, 80, 200, 40), "💼 Falar com Júlia")) {
-                dialogState = 2;
-                int month = (GlobalCurrentDay / 30) + 1;
-                dialogText = $"<b>[Júlia (Gerente)]</b>: Olá Chefe! Mês {month}. Nossa frota é de {companyFleet} cavalo(s).\nMultiplicador R$ na Praça: <b>x{demandMultiplier:F2}</b>.\nQual VIP conectou?";
+            GUI.Label(new Rect(25, 20, windowRect.width - 50, 40), "<color=#00e5ff><b>CENTRAL DE OPERAÇÕES LOGÍSTICAS</b></color>", textStyle);
+            float btnW = 210; float btnH = 45; float gap = 15;
+            GUI.backgroundColor = new Color(0.1f, 0.3f, 0.6f, 0.9f);
+            if (GUI.Button(new Rect(25, 90, btnW, btnH), "💼 JÚLIA (GESTÃO)")) { 
+                currentNPC = "Julia"; 
+                dialogState = 2; 
+                StartCoroutine(FetchCompanyStateForJulia()); 
             }
-            
-            GUI.backgroundColor = new Color(0.9f, 0.6f, 0.1f, 0.9f);
-            if (GUI.Button(new Rect(230, 80, 230, 40), "💰 Juca (Caminhão R$12K)")) {
-                currentNPC = "Vendedor";
-                dialogText = "<b>[Juca Vendas]</b>: Caminhão zero no pátio, R$ 12.000 à vista. Leva?";
-                dialogState = 2;
+            GUI.backgroundColor = new Color(0.7f, 0.4f, 0.1f, 0.9f);
+            if (GUI.Button(new Rect(25 + (btnW + gap), 90, btnW, btnH), "💰 JUCA (FROTA)")) { 
+                currentNPC = "Vendedor"; 
+                dialogText = "<b>[Juca Vendas]</b>: Caminhão zero no pátio, R$ 12.000 à vista. Leva?"; 
+                dialogState = 2; 
             }
-
-            GUI.backgroundColor = new Color(0.1f, 0.7f, 0.3f, 0.9f);
-            if (GUI.Button(new Rect(470, 80, 180, 40), "🏦 Banco (Sr. Carvalho)")) {
-                dialogState = 6;
-                dialogText = stateHasLoan ? "<b>[Sr. Carvalho]</b>: Prezado, você JÁ PEGOU SEU EMPRÉSTIMO. Pague suas parcelas do dia 30!" : "<b>[Sr. Carvalho (Banco)]</b>: Olá! Liberei um Crédito de R$ 30.000 (Trinta Mil) na sua conta hoje. \nAVISO: Descontaremos R$ 5.000 de Parcelas Direto do Seu Caixa Todo Dia 30! Assinar?";
+            GUI.backgroundColor = new Color(0.1f, 0.5f, 0.2f, 0.9f);
+            if (GUI.Button(new Rect(25 + (btnW + gap) * 2, 90, btnW, btnH), "🏦 BANCO (CRÉDITO)")) { 
+                currentNPC = "Banco";
+                dialogState = 6; 
             }
-
-            GUI.backgroundColor = new Color(0.6f, 0.2f, 0.8f, 0.9f);
-            if (GUI.Button(new Rect(660, 80, 180, 40), "🔧 Oficina Mecânica")) {
-                dialogState = 7;
-                dialogText = "<b>[Mecânico]</b>: Quer blindar seus caminhões contra imprevistos na rodovia e desvios de GPS pra não perder dinheiro na viagem?";
+            GUI.backgroundColor = new Color(0.5f, 0.1f, 0.5f, 0.9f);
+            if (GUI.Button(new Rect(25 + (btnW + gap) * 3, 90, btnW, btnH), "🔧 OFICINA (UPGRADES)")) { 
+                currentNPC = "Oficina";
+                dialogState = 7; 
             }
-
-            GUI.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.9f); 
+            GUI.backgroundColor = new Color(0.8f, 0.1f, 0.1f, 0.8f);
+            if (GUI.Button(new Rect(windowRect.width - 100, 10, 80, 30), "SAIR")) { ResetDialog(); }
         }
-        else if (dialogState == 2 && currentNPC != "Vendedor") // JÚLIA E CONTATOS V.N.
+        else if (dialogState == 2 && currentNPC != "Vendedor") // JÚLIA
         {
-            dialogTitle = "Central de Operações Tycoon";
-            
-            // FOTO VIP DA JULIA NO HEADER 
-            if (npcJulia != null) GUI.DrawTexture(new Rect(20, 30, 80, 80), npcJulia, ScaleMode.ScaleToFit);
-            GUI.Label(new Rect(110, 30, windowRect.width - 150, 80), dialogText, textStyle);
-
-            GUI.Label(new Rect(20, 115, windowRect.width - 40, 30), $"<b>Catálogo de Clientes Disponíveis:</b> (Frota Disponível: {GlobalFleet - contractsAcceptedToday}/{GlobalFleet})", textStyle);
-
+            GUI.color = new Color(1,1,1,0.1f);
+            GUI.DrawTexture(new Rect(0,0, windowRect.width, 100), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            if (npcJulia != null) GUI.DrawTexture(new Rect(25, 15, 70, 70), npcJulia, ScaleMode.ScaleToFit);
+            GUI.Label(new Rect(110, 20, windowRect.width - 150, 80), $"<size=18><b>Júlia - Gerência</b></size>\n{dialogText}", textStyle);
             if (contractsAcceptedToday >= GlobalFleet) {
-                GUI.backgroundColor = Color.red;
-                GUI.Box(new Rect(20, 145, windowRect.width - 40, 235), "");
-                GUI.Label(new Rect(40, 200, windowRect.width - 80, 100), "<size=24><b>⚠️ FROTA 100% OCUPADA</b></size>\n\nVocê já despachou todos os caminhões disponíveis para hoje. \n<b>Dica:</b> Encerre o dia no botão '🌙 Fechar Caixa' para renovar sua frota amanhã!", new GUIStyle(textStyle) { alignment = TextAnchor.MiddleCenter });
-                GUI.backgroundColor = Color.white;
+                GUI.Label(new Rect(20, 150, windowRect.width - 40, 200), "<size=24><color=#ff4444><b>⚠️ TODA A FROTA ESTÁ EM TRÂNSITO</b></color></size>", new GUIStyle(textStyle) { alignment = TextAnchor.MiddleCenter });
             } else {
-                // MURAL 1: ROBERTO ALIMENTOS
-            GUI.Box(new Rect(20, 145, 170, 235), "");
-            if (npcRoberto != null) GUI.DrawTexture(new Rect(30, 155, 150, 125), npcRoberto, ScaleMode.ScaleToFit);
-            else GUI.Label(new Rect(30, 155, 150, 125), "[Sem Avatar]", textStyle);
-            GUI.Label(new Rect(30, 290, 150, 40), "📦 Roberto (Alimentos)", textStyle);
-            if (GUI.Button(new Rect(30, 330, 150, 40), $"R$ {800 * demandMultiplier:F0}")) { currentNPC = "Alimentos"; finalRevenue = 800f * demandMultiplier; StartDialogTree(); }
-
-            // MURAL 2: ENG. TANAKA PEÇAS
-            GUI.Box(new Rect(200, 145, 170, 235), "");
-            if (npcTanaka != null) GUI.DrawTexture(new Rect(210, 155, 150, 125), npcTanaka, ScaleMode.ScaleToFit);
-            else GUI.Label(new Rect(210, 155, 150, 125), "[Sem Avatar]", textStyle);
-            GUI.Label(new Rect(210, 290, 150, 40), "⚙️ Tanaka (Peças)", textStyle);
-            if (GUI.Button(new Rect(210, 330, 150, 40), $"R$ {1500 * demandMultiplier:F0}")) { currentNPC = "Peças"; finalRevenue = 1500f * demandMultiplier; StartDialogTree(); }
-
-            // MURAL 3: DRA SILVIA LUXURY
-            GUI.Box(new Rect(380, 145, 170, 235), "");
-            if (npcSilvia != null) GUI.DrawTexture(new Rect(390, 155, 150, 125), npcSilvia, ScaleMode.ScaleToFit);
-            else GUI.Label(new Rect(390, 155, 150, 125), "[Sem Avatar]", textStyle);
-            GUI.Label(new Rect(390, 290, 150, 40), "💊 Dra. Silvia (Vacinas)", textStyle);
-            if (GUI.Button(new Rect(390, 330, 150, 40), $"R$ {3500 * demandMultiplier:F0}")) { currentNPC = "Medicamentos"; finalRevenue = 3500f * demandMultiplier; StartDialogTree(); }
-
-            // MURAL 4: CARLOS PETROLEO
-            GUI.Box(new Rect(560, 145, 170, 235), "");
-            if (npcCarlos != null) GUI.DrawTexture(new Rect(570, 155, 150, 125), npcCarlos, ScaleMode.ScaleToFit);
-            else GUI.Label(new Rect(570, 155, 150, 125), "[Sem Avatar]", textStyle);
-            GUI.Label(new Rect(570, 290, 150, 40), "🛢️ Carlos (Petróleo)", textStyle);
-            if (GUI.Button(new Rect(570, 330, 150, 40), $"R$ {5000 * demandMultiplier:F0}")) { currentNPC = "Petróleo"; finalRevenue = 5000f * demandMultiplier; StartDialogTree(); }
-
-            // MURAL 5: MARÇAL CONTÊINER
-            GUI.Box(new Rect(740, 145, 170, 235), "");
-            if (npcMarcal != null) GUI.DrawTexture(new Rect(750, 155, 150, 125), npcMarcal, ScaleMode.ScaleToFit);
-            else GUI.Label(new Rect(750, 155, 150, 125), "[Sem Avatar]", textStyle);
-            GUI.Label(new Rect(750, 290, 150, 40), "🚢 Marçal (Portuário)", textStyle);
-            if (GUI.Button(new Rect(750, 330, 150, 40), $"R$ {2800 * demandMultiplier:F0}")) { currentNPC = "Contêiner"; finalRevenue = 2800f * demandMultiplier; StartDialogTree(); }
+                float cardW = 170; float cardH = 240; float cardGap = 10;
+                string[] npcs = { "Roberto", "Tanaka", "Silvia", "Carlos", "Marçal" };
+                Texture2D[] pics = { npcRoberto, npcTanaka, npcSilvia, npcCarlos, npcMarcal };
+                float[] revs = { 800, 1500, 3500, 5000, 2800 };
+                string[] types = { "Alimentos", "Peças", "Vacinas", "Petróleo", "Contêiner" };
+                for(int i=0; i<5; i++) {
+                    Rect r = new Rect(25 + (cardW + cardGap) * i, 120, cardW, cardH);
+                    GUI.backgroundColor = new Color(0, 0, 0, 0.5f);
+                    GUI.Box(r, "");
+                    if (pics[i] != null) GUI.DrawTexture(new Rect(r.x+10, r.y+10, cardW-20, 120), pics[i], ScaleMode.ScaleToFit);
+                    GUI.Label(new Rect(r.x+10, r.y+140, cardW-20, 40), $"<b>{npcs[i]}</b>", textStyle);
+                    GUI.backgroundColor = accentCyan;
+                    if (GUI.Button(new Rect(r.x+10, r.y+190, cardW-20, 35), $"R$ {revs[i] * demandMultiplier:F0}")) {
+                        currentNPC = types[i]; finalRevenue = revs[i] * demandMultiplier; StartDialogTree();
+                    }
+                }
             }
-
-            // BOTAO FINAL DE DESLIGAR ISOLADO NA DIREITA
-            GUI.backgroundColor = new Color(0.8f, 0.2f, 0.2f, 0.9f);
-            if (GUI.Button(new Rect(windowRect.width - 150, 30, 120, 40), "[Desligar]")) { ResetDialog(); }
-            GUI.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.9f); // Volta o fundo pra padrão
+            GUI.backgroundColor = new Color(0.8f, 0.1f, 0.1f, 0.8f);
+            if (GUI.Button(new Rect(windowRect.width - 100, 10, 80, 30), "VOLTAR")) { dialogState = 1; }
         }
-        else if (dialogState == 2 && currentNPC == "Vendedor") // JUCA
+        else if (dialogState == 2 && currentNPC == "Vendedor") // JUCA (FROTA)
         {
-            dialogTitle = "Mecânica Pesada do Juca Automóveis";
-            GUI.Label(new Rect(20, 30, windowRect.width - 40, 60), dialogText, textStyle);
-            if (!isSubmitting && GUI.Button(new Rect(20, 100, 300, 40), "[Comprar Truck] Fechado.")) { isSubmitting = true; dialogState = 5; StartCoroutine(BuyTruckAPI()); }
-            if (GUI.Button(new Rect(340, 100, 300, 40), "[Recusar] Achei salgado.")) { ResetDialog(); }
-        }
-        else if (dialogState >= 3 && dialogState <= 5) // CONTRATOS DO CLIENTE
-        {
-            dialogTitle = $"Ligação: {currentNPC} | Proposta Inicial: R$ {finalRevenue:F2}";
-            GUI.Label(new Rect(20, 30, windowRect.width - 40, 60), dialogText, textStyle);
-            if (dialogState == 3) {
-                if (GUI.Button(new Rect(20, 100, 300, 40), "[Proteção Total] Enviarei agora.")) { dialogState = 4; if(currentNPC == "Peças") finalRevenue -= 150; UpdateRound2Text(); }
-                if (GUI.Button(new Rect(340, 100, 300, 40), "[Taxar Risco Adicional] Adiciona 10%.")) { finalRevenue *= 1.10f; dialogState = 4; UpdateRound2Text(); }
-            } else if (dialogState == 4) {
-               if (!isSubmitting && GUI.Button(new Rect(20, 100, 400, 40), $"📝 Assinar Papelada por R$ {finalRevenue:F2}")) { 
-                   isSubmitting = true; dialogState = 5; StartCoroutine(SignContractAPI()); 
-               }
-            }
-        }
-        else if (dialogState == 6) // BANCO TYCOON
-        {
-            dialogTitle = "Agência Bancária Nacional (Empréstimos)";
-            GUI.Label(new Rect(20, 30, windowRect.width - 40, 60), dialogText, textStyle);
-            if (!stateHasLoan && !isSubmitting && GUI.Button(new Rect(20, 100, 350, 40), "[Me dê os R$ 30.000 agora] Suportarei as parcelas!")) { 
-                isSubmitting = true; dialogState = 5; StartCoroutine(TakeLoanAPI()); 
-            }
-            if (GUI.Button(new Rect(380, 100, 200, 40), "[Desligar Telefone]")) { ResetDialog(); }
-        }
-        else if (dialogState == 7) // OFICINA MECANICA (UPGRADES)
-        {
-            dialogTitle = "A Casa das Peças Vips - Bloqueador de Acidentes";
-            GUI.Label(new Rect(20, 30, windowRect.width - 40, 60), dialogText, textStyle);
+            if (npcCarlos != null) GUI.DrawTexture(new Rect(25, 20, 100, 100), npcCarlos, ScaleMode.ScaleToFit);
+            GUI.Label(new Rect(140, 30, windowRect.width - 180, 80), $"<size=18><b>Juca - Gestor de Frota</b></size>\n{dialogText}", textStyle);
             
-            if (!GlobalHasPremiumTires && !isSubmitting) {
-                if (GUI.Button(new Rect(20, 100, 310, 40), "🛣️ Pneu Michelin (R$ 4.000)\nZera os buracos severos!")) { 
-                    isSubmitting = true; dialogState = 5; StartCoroutine(BuyUpgradeAPI("tires")); 
-                }
-            } else if (GlobalHasPremiumTires) {
-                GUI.Label(new Rect(20, 110, 310, 40), "🛣️ Você Comprou os Pneus!", textStyle);
+            GUI.backgroundColor = accentCyan;
+            if (!isSubmitting && GUI.Button(new Rect(140, 120, 350, 50), "🚚 COMPRAR CAMINHÃO (R$ 12.000)")) {
+                isSubmitting = true;
+                dialogState = 5; 
+                StartCoroutine(BuyTruckAPI());
             }
-
-            if (!GlobalHasAdvancedGPS && !isSubmitting) {
-                if (GUI.Button(new Rect(340, 100, 310, 40), "🛰️ Satélite Geo Militar (R$ 2.000)\nNunca mais vai se perder em desvios!")) { 
-                    isSubmitting = true; dialogState = 5; StartCoroutine(BuyUpgradeAPI("gps")); 
+            
+            GUI.backgroundColor = Color.grey;
+            if (GUI.Button(new Rect(windowRect.width - 100, 10, 80, 30), "VOLTAR")) { dialogState = 1; }
+        }
+        else if (dialogState == 3 || dialogState == 4) // CONTRATOS
+        {
+            GUI.Label(new Rect(30, 30, windowRect.width - 60, 60), $"<size=18><b>PROPOSTA: {currentNPC}</b></size>\n{dialogText}", textStyle);
+            if (dialogState == 3) {
+                GUI.backgroundColor = accentCyan;
+                if (GUI.Button(new Rect(30, 100, 250, 45), "ACEITAR")) { dialogState = 4; UpdateRound2Text(); }
+            } else if (dialogState == 4) {
+                GUI.backgroundColor = new Color(0, 1, 0.5f, 0.9f);
+                if (!isSubmitting && GUI.Button(new Rect(30, 100, 400, 50), $"📝 ASSINAR: R$ {finalRevenue:N2}")) { 
+                    isSubmitting = true; dialogState = 5; StartCoroutine(SignContractAPI()); 
                 }
-            } else if (GlobalHasAdvancedGPS) {
-                GUI.Label(new Rect(340, 110, 310, 40), "🛰️ Satélite GPS Já Adquirido!", textStyle);
             }
-
-            if (GUI.Button(new Rect(680, 100, 150, 40), "[Desligar]")) { ResetDialog(); }
+        }
+        else if (dialogState == 6) // BANCO
+        {
+            GUI.Label(new Rect(25, 20, windowRect.width - 50, 80), $"<size=18><b>🏦 Banco Tycoon - Crédito</b></size>\n{dialogText}", textStyle);
+            if (!stateHasLoan && !isSubmitting) {
+                GUI.backgroundColor = accentCyan;
+                if (GUI.Button(new Rect(25, 100, 350, 45), "TOMAR EMPRÉSTIMO (R$ 30.000)")) { isSubmitting = true; dialogState = 5; StartCoroutine(TakeLoanAPI()); }
+            }
+            GUI.backgroundColor = Color.grey;
+            if (GUI.Button(new Rect(windowRect.width - 100, 10, 80, 30), "VOLTAR")) { ResetDialog(); }
+        }
+        else if (dialogState == 7) // OFICINA
+        {
+            GUI.Label(new Rect(25, 20, windowRect.width - 50, 80), $"<size=18><b>🔧 Oficina Especializada</b></size>\n{dialogText}", textStyle);
+            if (!GlobalHasPremiumTires) {
+                GUI.backgroundColor = accentCyan;
+                if (GUI.Button(new Rect(25, 100, 250, 45), "PNEU PREMIUM (R$ 4.000)")) { isSubmitting = true; dialogState = 5; StartCoroutine(BuyUpgradeAPI("tires")); }
+            }
+            if (!GlobalHasAdvancedGPS) {
+                GUI.backgroundColor = accentCyan;
+                if (GUI.Button(new Rect(300, 100, 250, 45), "GPS MILITAR (R$ 2.000)")) { isSubmitting = true; dialogState = 5; StartCoroutine(BuyUpgradeAPI("gps")); }
+            }
+            GUI.backgroundColor = Color.grey;
+            if (GUI.Button(new Rect(windowRect.width - 100, 10, 80, 30), "VOLTAR")) { ResetDialog(); }
         }
     }
 
@@ -569,7 +568,7 @@ public class DialogueSystem : MonoBehaviour
         isSubmitting = false; 
         ResetDialog();
         TriggerHUDRefresh(); // Agora ele puxa o saldo logo na largada do contrato!
-        FindFirstObjectByType<TycoonTimeManager>()?.AdvanceHours(2);
+        FindObjectOfType<TycoonTimeManager>()?.AdvanceHours(2);
     }
 
     IEnumerator BuyTruckAPI() {

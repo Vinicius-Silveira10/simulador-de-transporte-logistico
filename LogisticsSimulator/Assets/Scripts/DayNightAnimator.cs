@@ -2,38 +2,54 @@ using UnityEngine;
 
 public class DayNightAnimator : MonoBehaviour
 {
-    private float rotationSpeed = 3f; // Graus que o sol passa por segundo
+    [Header("Configuração de Atmosfera")]
+    private Light sunLight;
     
-    // Opcional: Variar a cor do céu da câmera com o passar das horas
-    private Camera cam;
+    // Paleta de Cores Cinematográficas
+    private Color dawnColor = new Color(1f, 0.5f, 0.3f); // Alvorecer Laranja
+    private Color dayColor = new Color(1f, 1f, 0.95f);  // Dia Branco Quente
+    private Color duskColor = new Color(0.6f, 0.3f, 0.7f); // Crepúsculo Roxo/Rosa
+    private Color nightColor = new Color(0.05f, 0.05f, 0.2f); // Noite Azul Profunda
 
     void Start()
     {
-        cam = Camera.main;
+        sunLight = GetComponent<Light>();
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.ExponentialSquared;
     }
 
     void Update()
     {
-        // Gira a iluminação central dando efeito de passagem de semanas (Sombras Dinâmicas!)
-        transform.Rotate(Vector3.right, rotationSpeed * Time.deltaTime);
+        // FORÇADO: Sempre Meio-Dia para visibilidade Elite
+        float hour = 12f; 
+        float sunRotation = (hour * 15f) - 90f; 
+        transform.rotation = Quaternion.Euler(sunRotation, -30f, 0f);
 
-        // Abaixo da linha do Equador (- rotationX entre 0 e 180 é cima)
-        float angleX = transform.eulerAngles.x;
+        UpdateAtmosphere(hour);
+    }
 
-        if (cam != null)
+    void UpdateAtmosphere(float hour)
+    {
+        Color targetSky;
+        float intensity;
+        float fogDensity;
+
+        // MODO ELITE DIA PERMANENTE
+        targetSky = dayColor;
+        intensity = 1.2f;
+        fogDensity = 0.003f;
+
+        // Aplica as mudanças no RenderSettings (Atmosfera Global)
+        Camera.main.backgroundColor = targetSky;
+        RenderSettings.fogColor = targetSky;
+        RenderSettings.fogDensity = fogDensity;
+        
+        if (sunLight != null)
         {
-            if (angleX < 180f)
-            {
-                // De dia (Azul Claro Vivo)
-                cam.backgroundColor = Color.Lerp(cam.backgroundColor, new Color(0.4f, 0.6f, 0.8f), Time.deltaTime);
-                GetComponent<Light>().intensity = Mathf.Lerp(GetComponent<Light>().intensity, 1.2f, Time.deltaTime);
-            }
-            else
-            {
-                // De noite (Ceu Estrelado escuro)
-                cam.backgroundColor = Color.Lerp(cam.backgroundColor, new Color(0.05f, 0.05f, 0.15f), Time.deltaTime);
-                GetComponent<Light>().intensity = Mathf.Lerp(GetComponent<Light>().intensity, 0.1f, Time.deltaTime);
-            }
+            sunLight.intensity = intensity;
+            sunLight.color = targetSky;
+            // Desativa sombras pesadas à noite para performance e estética
+            sunLight.shadows = (hour > 19f || hour < 5f) ? LightShadows.None : LightShadows.Soft;
         }
     }
 }

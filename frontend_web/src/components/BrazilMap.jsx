@@ -1,8 +1,17 @@
-import { MapContainer, TileLayer, CircleMarker, Tooltip, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Tooltip, Polyline, Marker } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Base da Empresa (Sede HQ) será sempre São Paulo
 const hqLocation = { name: "Sede Logística Central - São Paulo, SP", lat: -23.5505, lng: -46.6333 };
+
+// Ícone do Radar Pulsante
+const radarIcon = L.divIcon({
+  className: 'radar-container',
+  html: '<div class="radar-pulse"></div>',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
+});
 
 // Lista de destinos logísticos espalhados pelo Brasil
 const cityNodes = [
@@ -25,8 +34,6 @@ const getCityForCoordinate = (coordStr) => {
     hash = coordStr.charCodeAt(i) + ((hash << 5) - hash);
   }
   const index = Math.abs(hash) % cityNodes.length;
-  // Se o destino selecionado for São Paulo, a gente força a ser outro lugar aleatório da lista
-  // para que seja possível desenhar uma Rota visual (senão a linha seria invisível)
   if(index === 0) return cityNodes[1]; 
   return cityNodes[index];
 };
@@ -52,7 +59,6 @@ export default function BrazilMap({ trips }) {
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
         
-        {/* Marcador Fixo da Matriz em São Paulo */}
         <CircleMarker 
             center={[hqLocation.lat, hqLocation.lng]} 
             pathOptions={{ color: "var(--accent-red)", fillColor: "var(--accent-red)", fillOpacity: 0.9 }}
@@ -63,35 +69,40 @@ export default function BrazilMap({ trips }) {
           </Tooltip>
         </CircleMarker>
 
-        {/* Linhas conectando SP até o destino de cada viagem feita */}
         {tripMarkers.map(marker => (
           <div key={marker.id}>
-            {/* O desenho da Rota no Brasil */}
             <Polyline 
               positions={[ [hqLocation.lat, hqLocation.lng], [marker.lat, marker.lng] ]} 
               pathOptions={{ 
                 color: marker.status === "Finished" ? "var(--accent-green)" : "var(--accent-cyan)", 
                 weight: marker.status === "Finished" ? 2 : 3,
-                dashArray: marker.status === "Finished" ? null : "8, 8", // Pontilhado animado se estiver rodando
+                dashArray: marker.status === "Finished" ? null : "8, 8",
                 lineCap: 'round',
                 opacity: marker.status === "Finished" ? 0.3 : 0.8
               }}
             />
-            {/* O Ponto do Destino */}
-            <CircleMarker 
-              center={[marker.lat, marker.lng]} 
-              pathOptions={{ 
-                color: marker.status === "Finished" ? "var(--accent-green)" : "var(--accent-cyan)", 
-                fillColor: marker.status === "Finished" ? "var(--accent-green)" : "var(--accent-cyan)", 
-                fillOpacity: 0.8 
-              }}
-              radius={8}
-            >
-              <Tooltip>
-                Destino do Frete: {marker.name} <br/>
-                Status: {marker.status}
-              </Tooltip>
-            </CircleMarker>
+            {marker.status !== "Finished" ? (
+              <Marker position={[marker.lat, marker.lng]} icon={radarIcon}>
+                <Tooltip>
+                  <strong>Frete em Trânsito</strong><br/>
+                  Destino: {marker.name}
+                </Tooltip>
+              </Marker>
+            ) : (
+              <CircleMarker 
+                center={[marker.lat, marker.lng]} 
+                pathOptions={{ 
+                  color: "var(--accent-green)", 
+                  fillColor: "var(--accent-green)", 
+                  fillOpacity: 0.8 
+                }}
+                radius={8}
+              >
+                <Tooltip>
+                  Entregue: {marker.name}
+                </Tooltip>
+              </CircleMarker>
+            )}
           </div>
         ))}
       </MapContainer>

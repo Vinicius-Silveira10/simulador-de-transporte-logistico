@@ -12,39 +12,42 @@ public class TrafficManager : MonoBehaviour
 
     void Start()
     {
-        StartCoroutine(TrafficRoutine());
+        // DESATIVADO: A pedido do usuário para foco total no caminhão amarelo
+        foreach (var old in FindObjectsOfType<EliteCarAI>()) Destroy(old.gameObject);
+        foreach (var old in FindObjectsOfType<SimpleCarAI>()) Destroy(old.gameObject);
+        
+        Debug.Log("TrafficManager: Tráfego desativado para limpeza do cenário.");
     }
 
     IEnumerator TrafficRoutine()
     {
-        // Dá um tempinho inicial antes de congestionar as vias
-        yield return new WaitForSeconds(1f);
+        yield break; // Não faz nada
+    }
 
-        while (true)
-        {
-            if (carPrefabs != null && carPrefabs.Length > 0)
-            {
-                // Roleta de carros
-                int randomCarIndex = Random.Range(0, carPrefabs.Length);
-                GameObject selectedCarPrefab = carPrefabs[randomCarIndex];
-                
-                if (selectedCarPrefab != null) 
-                {
-                    // Usa Instantiate normal de Runtime PBR
-                    GameObject activeCar = Instantiate(selectedCarPrefab, startSpawnPosition, spawnRotation);
-                    
-                    // Injeta a Inteligência Artificial dinamicamente!
-                    activeCar.AddComponent<SimpleCarAI>();
-                    
-                    // Injeta um BoxCollider para o Raycast saber que o carro tem "Massa Física"
-                    if (activeCar.GetComponent<Collider>() == null) {
-                        activeCar.AddComponent<BoxCollider>();
-                    }
-                }
-            }
-            
-            // Ritmo orgânico de engarrafamento (ex: de 2.5 a 4.5 segundos)
-            yield return new WaitForSeconds(spawnInterval + Random.Range(-1f, 1f));
+    void SpawnRandomVehicle()
+    {
+        GameObject prefab = carPrefabs[Random.Range(0, carPrefabs.Length)];
+        Vector3 spawnPos = Vector3.zero;
+        Quaternion spawnRot = Quaternion.identity;
+
+        // Roleta de Pontos de Spawn (Sincronizado com o Grid de Estradas)
+        int lane = Random.Range(0, 4);
+        if (lane == 0) { // Rodovia Norte (Faixa Direita)
+            spawnPos = new Vector3(6f, 0.2f, -300f);
+            spawnRot = Quaternion.Euler(0, 0, 0);
+        } else if (lane == 1) { // Rodovia Sul (Faixa Esquerda)
+            spawnPos = new Vector3(-6f, 0.2f, 300f);
+            spawnRot = Quaternion.Euler(0, 180, 0);
+        } else if (lane == 2) { // Eixo Z Negativo (Rua Lateral)
+            spawnPos = new Vector3(300f, 0.2f, 0f);
+            spawnRot = Quaternion.Euler(0, -90, 0);
+        } else { // Eixo Z Positivo (Rua Lateral)
+            spawnPos = new Vector3(-300f, 0.2f, 0f);
+            spawnRot = Quaternion.Euler(0, 90, 0);
         }
+
+        GameObject car = Instantiate(prefab, spawnPos, spawnRot);
+        car.AddComponent<EliteCarAI>();
+        if (car.GetComponent<Collider>() == null) car.AddComponent<BoxCollider>();
     }
 }

@@ -16,6 +16,14 @@ public class TycoonTimeManager : MonoBehaviour
     void Start()
     {
         Debug.Log("Tycoon de Turnos Aguardando Ações Táticas...");
+        
+        // FORÇA BRUTA: Injeção de Sistemas Elite
+        if (FindObjectOfType<EliteAmbienceManager>() == null) {
+            new GameObject("Elite_Ambience_Force").AddComponent<EliteAmbienceManager>();
+        }
+        if (FindObjectOfType<EliteCameraAdjuster>() == null) {
+            new GameObject("Elite_Camera_Adjuster").AddComponent<EliteCameraAdjuster>();
+        }
     }
 
     public void AdvanceHours(int hoursToAdd)
@@ -60,7 +68,7 @@ public class TycoonTimeManager : MonoBehaviour
                DialogueSystem.GlobalCurrentDay = novoDia;
 
                // ATUALIZA A HUD E OS VALORES NA TELA E DISPARA O EVENTO DE "FECHAMENTO DE CAIXA"
-               DialogueSystem ui = FindFirstObjectByType<DialogueSystem>();
+               DialogueSystem ui = FindObjectOfType<DialogueSystem>();
                if (ui != null) {
                    ui.TriggerHUDRefresh();
                    // A Júlia agora para a tela renderizando o Lucro do Dia, por isso o Toast sumiu daqui!
@@ -77,7 +85,7 @@ public class TycoonTimeManager : MonoBehaviour
 
                // EVENTO DE NPC (Ex: Policial parando na estrada) -> A cada 7 dias
                if (novoDia % 7 == 0 && !DialogueSystem.EndGameLocked) {
-                   FindFirstObjectByType<DialogueSystem>()?.TriggerRandomEvent();
+                   FindObjectOfType<DialogueSystem>()?.TriggerRandomEvent();
                }
                if (localDayCounter >= 30 && !DialogueSystem.EndGameLocked) {
                    localDayCounter = 0;

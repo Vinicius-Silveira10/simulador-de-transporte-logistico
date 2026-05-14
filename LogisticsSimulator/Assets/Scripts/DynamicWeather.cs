@@ -9,51 +9,25 @@ public class DynamicWeather : MonoBehaviour
 
     void Start()
     {
-        Debug.Log("Satélite Meteorológico Ativado!");
+        IsRaining = false;
+        Debug.Log("CHUVAS DESATIVADAS PERMANENTEMENTE.");
         
-        GameObject rainObj = new GameObject("TempestadeLogistica");
-        rainObj.transform.position = new Vector3(0, 15, 10);
-        rainObj.transform.rotation = Quaternion.Euler(90, 0, 0); 
-        
-        rainSystem = rainObj.AddComponent<ParticleSystem>();
-        var main = rainSystem.main;
-        main.startColor = new Color(0.6f, 0.7f, 0.9f, 0.8f);
-        main.startSize = 0.08f;
-        main.startSpeed = 40f;
-        main.startLifetime = 1.0f;
-        main.maxParticles = 8000;
+        // Destruição Forçada de qualquer sistema de chuva residual na cena
+        GameObject oldRain = GameObject.Find("TempestadeLogistica");
+        if (oldRain != null) Destroy(oldRain);
 
-        var em = rainSystem.emission;
-        em.rateOverTime = 0f;
-
-        var shape = rainSystem.shape;
-        shape.shapeType = ParticleSystemShapeType.Box;
-        shape.scale = new Vector3(60, 60, 1);
-
-        var vel = rainSystem.velocityOverLifetime;
-        vel.enabled = true;
-        vel.yMultiplier = -30f;
-        
-        var ren = rainSystem.GetComponent<ParticleSystemRenderer>();
-        // Tentativa de puxar um shader de particula se existir, senao default
-        Material ptMat = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
-        if(ptMat != null) ren.material = ptMat;
-        ren.lengthScale = 15f;
-        ren.renderMode = ParticleSystemRenderMode.Stretch; 
-        
-        GameObject patio = GameObject.Find("PatioLogistico");
-        if(patio != null) groundMat = patio.GetComponent<Renderer>().material;
+        // Se houver algum ParticleSystem de chuva rodando, desativa
+        foreach (var ps in FindObjectsOfType<ParticleSystem>()) {
+            if (ps.name.Contains("Chuva") || ps.name.Contains("Rain") || ps.name.Contains("Tempestade")) {
+                ps.Stop();
+                ps.gameObject.SetActive(false);
+            }
+        }
     }
 
     void Update()
     {
-        weatherTimer += Time.deltaTime;
-        if (weatherTimer > 8f) { // Gira roleta a cada 8s
-            weatherTimer = 0f;
-            int chance = Random.Range(0, 100);
-            if (chance < 25 && !IsRaining) StartRain();
-            else if (chance >= 25 && chance < 60 && IsRaining) StopRain();
-        }
+        // Desativado pelo usuário
     }
 
     void StartRain() {
@@ -63,6 +37,11 @@ public class DynamicWeather : MonoBehaviour
             groundMat.color = new Color(0.04f, 0.04f, 0.05f);
             groundMat.SetFloat("_Glossiness", 0.98f); // Molhado
         }
+        
+        // Efeito Atmosférico de Neblina por Chuva (Suave para o modo Dia)
+        RenderSettings.fogColor = new Color(0.6f, 0.7f, 0.8f);
+        RenderSettings.fogDensity = 0.01f; // Visibilidade mantida
+        
         Debug.Log("TEMPESTADE INICIADA! Asfalto perigoso!");
     }
 
@@ -73,5 +52,8 @@ public class DynamicWeather : MonoBehaviour
             groundMat.color = new Color(0.12f, 0.12f, 0.13f);
             groundMat.SetFloat("_Glossiness", 0.2f); // Seco
         }
+        
+        // Restaura a neblina padrão Elite
+        RenderSettings.fogDensity = 0.003f;
     }
 }

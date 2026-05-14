@@ -21,7 +21,7 @@ export default function WebRegisterBox() {
         } else {
             setError("Erro: Nome já existe ou erro no servidor");
         }
-    } catch(e) {
+    } catch {
         setError("Servidor C# Desligado.");
     }
   };
@@ -32,9 +32,17 @@ export default function WebRegisterBox() {
         <Key size={24} color="var(--accent-magenta)" /> 
         Sincronizador Web (Motorista-Cliente)
       </h3>
-      <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "15px" }}>
-        Crie a Empresa no Banco do Site e envie a Token Key para o Unity.
-      </p>
+      <div style={{ background: 'rgba(251, 191, 36, 0.1)', padding: '20px', borderRadius: '16px', marginBottom: '2rem', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
+        <p style={{ margin: '0 0 12px 0', fontSize: "1.1rem", color: "var(--accent-amber)", fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.5px' }}>
+          🚀 COMO INICIAR SUA PARTIDA:
+        </p>
+        <ol style={{ margin: 0, paddingLeft: '25px', fontSize: '1rem', color: 'var(--text-primary)', lineHeight: '1.6', fontWeight: '500' }}>
+          <li>Defina o <b>Nome da sua Empresa</b> e escolha a <b>Duração do Contrato</b>.</li>
+          <li>Clique em <b>Gerar Chave Jogo</b> para obter seu Token de acesso único.</li>
+          <li>No Simulador (Unity), acesse o <b>PABX Central</b> e cole o código.</li>
+          <li><b>Sua frota e caixa serão sincronizados em tempo real!</b></li>
+        </ol>
+      </div>
       
       {!generatedKey ? (
         <div style={{ display: 'flex', gap: '10px' }}>

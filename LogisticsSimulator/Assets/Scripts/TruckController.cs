@@ -201,7 +201,7 @@ public class TruckController : MonoBehaviour
 
         if (request.result == UnityWebRequest.Result.Success) {
             Debug.Log($"Incidente Computado e Pago via PUT. NetProfit diminuido no BD.");
-            DialogueSystem ui = FindFirstObjectByType<DialogueSystem>();
+            DialogueSystem ui = FindObjectOfType<DialogueSystem>();
             if (ui != null) {
                 ui.TriggerHUDRefresh();
                 ui.ShowToast($"💰 Frete Pago: Caixa Atualizado!");

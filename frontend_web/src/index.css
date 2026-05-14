@@ -1,74 +1,103 @@
-/* Custom properties and base styles for Premium Glassmorphism */
 :root {
-  --bg-dark: #070B19; /* Extremely dark elegant blue/black */
-  --bg-card: rgba(15, 23, 42, 0.4);
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --accent-cyan: #06b6d4; /* electric cyan */
-  --accent-green: #10b981;
-  --accent-red: #f43f5e;
-  --accent-gold: #f59e0b;
+  --bg-dark: #020617; /* Deep Midnight Black */
+  --bg-sidebar: rgba(15, 23, 42, 0.8);
+  --bg-card: rgba(30, 41, 59, 0.4);
+  --border-glass: rgba(255, 255, 255, 0.05);
+  --text-primary: #f1f5f9;
+  --text-secondary: #64748b;
+  --accent-cyan: #22d3ee;
+  --accent-emerald: #10b981;
+  --accent-rose: #f43f5e;
+  --accent-amber: #fbbf24;
+  --font-main: 'Outfit', 'Inter', system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Outfit', 'Inter', sans-serif;
+  font-family: var(--font-main);
   background: var(--bg-dark);
   background-image: 
-    radial-gradient(circle at 10% 20%, rgba(6, 182, 212, 0.12), transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.08), transparent 40%),
-    radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.05), transparent 50%);
+    radial-gradient(circle at 0% 0%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(244, 63, 94, 0.05) 0%, transparent 50%);
   background-attachment: fixed;
   color: var(--text-primary);
   min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 #root {
-  max-width: 1400px;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* SIDEBAR ELITE */
+.sidebar {
+  width: 280px;
+  background: var(--bg-sidebar);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border-glass);
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  font-size: 1.5rem;
+  font-weight: 900;
+  background: linear-gradient(to right, #fff, var(--accent-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  letter-spacing: -1px;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.nav-item.active, .nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 10px rgba(255,255,255,0.02);
+}
+
+.nav-item.active {
+  border-left: 3px solid var(--accent-cyan);
+}
+
+/* CONTENT AREA */
+.main-content {
+  flex: 1;
+  padding: 2.5rem;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 2rem;
-}
-
-/* Base Glass Card */
-.glass-card {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-glass);
-  border-radius: 16px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Neon Glow Effect on HOVER */
-.glass-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2), 0 0 15px rgba(6, 182, 212, 0.15);
-  border-color: rgba(6, 182, 212, 0.3);
-}
-
-.glass-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: -100%; width: 50%; height: 100%;
-  background: linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent);
-  transform: skewX(-20deg);
-  transition: 0.5s;
-}
-
-.glass-card:hover::before {
-  left: 200%;
 }
 
 header {
-  margin-bottom: 3rem;
-  text-align: center;
+  margin-bottom: 2.5rem;
+  text-align: left;
 }
 
 header h1 {
@@ -91,9 +120,9 @@ header p {
 /* KPI SYSTEM */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2.5rem;
+  margin-bottom: 3rem;
 }
 
 .kpi-item {
@@ -205,6 +234,7 @@ tr:hover td { background: rgba(255,255,255,0.05); }
   align-self: flex-start;
 }
 
+/* ANIMATIONS & UTILITIES */
 .pulse-red { animation: pulsey 1.5s infinite; }
 @keyframes pulsey {
   0% { opacity: 1; }
@@ -212,12 +242,55 @@ tr:hover td { background: rgba(255,255,255,0.05); }
   100% { opacity: 1; }
 }
 
+/* Radar Pulse Effect for Map */
+.radar-pulse {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  background-color: var(--accent-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7);
+  animation: radar-ripple 2s infinite;
+}
+
+@keyframes radar-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(6, 182, 212, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+  }
+}
+
+/* Typewriter Cursor */
+.typewriter-cursor::after {
+  content: '|';
+  animation: blink 1s step-end infinite;
+  color: var(--accent-cyan);
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  from, to { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.staggered-item {
+  opacity: 0;
+}
+
 /* CARDS DE CONTRATANTES VIPS */
 .contracts-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem;
 }
+
+.oil-npc h3 { color: #facc15; }
+.cargo-npc h3 { color: #60a5fa; }
 
 .contract-npc {
   background: rgba(0,0,0,0.2);

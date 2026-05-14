@@ -12,18 +12,22 @@ export default function FinanceChart({ trips }) {
       );
   }
 
-  let cumulativeProfit = 0;
-  let cumulativeCosts = 0;
-  const chartData = trips.filter(t => t.status === "Finished").map((t, index) => {
-      cumulativeProfit += t.netProfit;
-      cumulativeCosts += (t.kmCosts + t.taxesAmount);
-      return {
+  const finishedTrips = trips.filter(t => t.status === "Finished");
+  
+  const chartData = finishedTrips.reduce((acc, t, index) => {
+      const prevProfit = acc.length > 0 ? acc[acc.length - 1].lucroLiq : 0;
+      const prevCosts = acc.length > 0 ? acc[acc.length - 1].custoOpe : 0;
+      
+      acc.push({
           nome: `Frete ${index + 1}`,
-          lucroLiq: parseFloat(cumulativeProfit.toFixed(2)),
-          custoOpe: parseFloat(cumulativeCosts.toFixed(2)),
-          incidente: t.incidentLogs !== "Nenhuma ocorrência. Viagem perfeita." ? true : false
-      };
-  });
+          lucroLiq: parseFloat((prevProfit + t.netProfit).toFixed(2)),
+          custoOpe: parseFloat((prevCosts + t.kmCosts + t.taxesAmount).toFixed(2)),
+          incidente: t.incidentLogs !== "Nenhuma ocorrência. Viagem perfeita."
+      });
+      return acc;
+  }, []);
+
+  const cumulativeProfit = chartData.length > 0 ? chartData[chartData.length - 1].lucroLiq : 0;
 
   // Calculate quick metrics for the chart header
   const currentProfit = cumulativeProfit;
@@ -32,49 +36,49 @@ export default function FinanceChart({ trips }) {
 
   return (
     <div className="glass-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
             <div>
-                <h3 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <TrendingUp color={"var(--accent-cyan)"} /> Gráfico de Capital da Empresa
+                <h3 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem' }}>
+                    <TrendingUp color={"var(--accent-cyan)"} size={22} /> FLUXO DE CAPITAL CORPORATIVO
                 </h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '5px 0 0 0' }}>Evolução acumulativa de Receita contra Despesas da Frota.</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '5px 0 0 0' }}>Análise de desempenho acumulado: Receita Líquida vs. Custos Operacionais.</p>
             </div>
             
             <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Momento Financeiro</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: growth >= 0 ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 'bold' }}>
-                    {growth >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                    <span>{growth >= 0 ? '+' : ''} R$ {growth.toFixed(2).replace('.',',')} no último frete</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Variação Último Frete</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: growth >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: '800', fontSize: '1.1rem' }}>
+                    {growth >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+                    <span>{growth >= 0 ? '+' : ''} R$ {growth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
             </div>
         </div>
         
-        <div style={{ width: '100%', height: 320 }}>
+        <div style={{ width: '100%', height: 350 }}>
             <ResponsiveContainer>
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                         <linearGradient id="colorLucro" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="var(--accent-green)" stopOpacity={0.6}/>
-                            <stop offset="95%" stopColor="var(--accent-green)" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="var(--accent-emerald)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="var(--accent-emerald)" stopOpacity={0}/>
                         </linearGradient>
                         <linearGradient id="colorCusto" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="var(--accent-red)" stopOpacity={0.6}/>
-                            <stop offset="95%" stopColor="var(--accent-red)" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="var(--accent-rose)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="var(--accent-rose)" stopOpacity={0}/>
                         </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="nome" stroke="var(--text-secondary)" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="var(--text-secondary)" fontSize={11} tickFormatter={(val) => `R$${val}`} tickLine={false} axisLine={false} />
+                    <CartesianGrid strokeDasharray="4 4" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                    <XAxis dataKey="nome" stroke="var(--text-secondary)" fontSize={11} tickLine={false} axisLine={false} tick={{dy: 10}} />
+                    <YAxis stroke="var(--text-secondary)" fontSize={11} tickFormatter={(val) => `R$${val/1000}k`} tickLine={false} axisLine={false} tick={{dx: -5}} />
                     
                     <Tooltip 
-                        contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(6, 182, 212, 0.3)', borderRadius: '12px', backdropFilter: 'blur(8px)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}
-                        itemStyle={{ color: 'var(--text-primary)', fontWeight: 'bold' }}
-                        labelStyle={{ color: 'var(--accent-cyan)', marginBottom: '5px' }}
+                        contentStyle={{ backgroundColor: 'rgba(2, 6, 23, 0.9)', border: '1px solid var(--border-glass)', borderRadius: '16px', backdropFilter: 'blur(12px)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}
+                        itemStyle={{ padding: '4px 0' }}
+                        cursor={{ stroke: 'var(--accent-cyan)', strokeWidth: 1 }}
                     />
                     
-                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                    <Area type="monotone" name="Lucro Acumulado (Net Worth)" dataKey="lucroLiq" stroke="var(--accent-green)" strokeWidth={3} fillOpacity={1} fill="url(#colorLucro)" />
-                    <Area type="monotone" name="Despesas Totais (Operação)" dataKey="custoOpe" stroke="var(--accent-red)" strokeWidth={3} fillOpacity={1} fill="url(#colorCusto)" />
+                    <Legend iconType="rect" wrapperStyle={{ paddingTop: '30px', fontSize: '12px', fontWeight: '500' }} />
+                    <Area type="monotone" name="Patrimônio Líquido" dataKey="lucroLiq" stroke="var(--accent-emerald)" strokeWidth={4} fillOpacity={1} fill="url(#colorLucro)" animationDuration={2000} />
+                    <Area type="monotone" name="Custos de Operação" dataKey="custoOpe" stroke="var(--accent-rose)" strokeWidth={4} fillOpacity={1} fill="url(#colorCusto)" animationDuration={2500} />
                 </AreaChart>
             </ResponsiveContainer>
         </div>
